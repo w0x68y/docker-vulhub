@@ -1,0 +1,87 @@
+version: '3'
+services:
+ s2:
+   image: vulhub/struts2:2.3.30
+   container_name: "struts2-045-out"
+   ports:
+    - "8080:8080"
+   expose:
+    - "8080"
+    - "22"
+   command: 
+            - bash
+            - -c
+            - |
+                mvn jetty:run
+                apt-get update && apt-get install -y openssh-server net-tools
+                mkdir /var/run/sshd
+                echo 'root:123456' | chpasswd
+                sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+                sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+                service ssh restart
+                tail -f /dev/null
+   restart: always
+   networks:
+    net1:
+        ipv4_address: 172.16.238.10
+
+ tomcat:
+   image: vulhub/redis:4.0.14
+   container_name: "redis"
+   expose:
+    - "6379"
+   command: 
+            - bash
+            - -c
+            - |
+                apt-get update && apt-get install -y openssh-server net-tools
+                mkdir /var/run/sshd
+                echo 'root:123456' | chpasswd
+                sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+                sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+                service ssh restart
+                redis-server
+                tail -f /dev/null
+   restart: always
+   networks:
+    net1:
+        ipv4_address: 172.16.238.81
+    net2:
+        ipv4_address: 10.10.5.6
+
+ centos:
+   image: centos:7
+   container_name: "centos7"
+   expose:
+    - "8080"
+    - "22"
+   command: 
+            - bash
+            - -c
+            - |
+                yum -y install passwd openssl openssh-server
+                echo "123456" | passwd --stdin root
+                ssh-keygen -q -t rsa -b 2048 -f /etc/ssh/ssh_host_rsa_key -N ''
+                ssh-keygen -q -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key -N ''
+                ssh-keygen -t dsa -f /etc/ssh/ssh_host_ed25519_key -N ''
+                sed -i "s/#UsePrivilegeSeparation.*/UsePrivilegeSeparation no/g" /etc/ssh/sshd_config
+                sed -i "s/UsePAM.*/UsePAM no/g" /etc/ssh/sshd_config
+                /usr/sbin/sshd -D
+                tail -f /dev/null
+   restart: always
+   networks:
+    net1:
+        ipv4_address: 172.16.238.82
+    net2:
+        ipv4_address: 10.10.5.7
+
+networks:
+  net1:
+    ipam:
+      config:
+        - subnet: "172.16.0.0/16"
+          #ip_range: "172.16.238.0/24"
+  net2:
+    ipam:
+      config:
+        - subnet: "10.10.5.0/24"
